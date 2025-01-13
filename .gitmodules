@@ -1,0 +1,6 @@
+[submodule "C/external/lz4"]
+	path = C/external/lz4
+	url = https://github.com/lz4/lz4.git
+[submodule "C/external/Monocypher"]
+	path = C/external/Monocypher
+	url = https://github.com/LoupVaillant/Monocypher.git
