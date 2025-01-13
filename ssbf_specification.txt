@@ -1,0 +1,290 @@
+* SSBF *
+
+SSBF is a binary data format, designed for use in embedded systems.
+It supports data compression and data encryption.
+
+All the multibyte entries are encoded as little-endian.
+
+**SSBF FORMAT DEFINITION**
+
+The format of the SSBF encoded data is described below:
+
+|-------------------------------------------+
+| main header                               |
+| {crypto header crypto payload (optional)} |
+| {meta data payload (optional)}            |
+| data header                               |
+| hash1                                     |
+|-------------------------------------------+
+| block1                                    |
+| block2                                    |
+| ...                                       |
+| blockN                                    |
+|-------------------------------------------+
+| hash2                                     |
+|-------------------------------------------+
+
+***MAIN HEADER***
+
+|---------------------------|
+| ssbf_magic_number         |
+| version                   |
+| flags                     |
+| reserved                  |
+| full_data_size_compressed |
+| hashed_data_size          |
+| header_checksum           |
+|---------------------------|
+
+****ssbf magic number****
+size: 4 bytes  
+
+The ssbf magic number is 0x19345601.
+
+****full_data_size_compressed****
+size: 4 bytes  
+
+The sum of all block payloads.
+
+****hashed_data_size****
+size: 2 bytes  
+
+Size of the data over which the header hash was calculated.
+
+****flags****
+size: 1 byte
+
+| Name                   | Bits | Description                    |
+|------------------------+------+--------------------------------|
+| reserved               | 6, 7 | For future use                 |
+|------------------------+------+--------------------------------|
+| use crypto extension   |    1 | 0 = No crypto header (default) |
+|                        |      | 1 = Crypto header present      |
+|------------------------+------+--------------------------------|
+| use metadata extension |    0 | 0 = No meta block (default)    |
+|                        |      | 1 = Meta block present         |
+|------------------------+------+--------------------------------|
+
+****header_checksum****
+size: 1 byte  
+
+BSD checksum (8-bit) of the above header fields.
+
+***ENCRYPTION HEADER (optional)***
+
+If data integrity and confidentiality are needed, the encryption
+header must be present. It provides all the info needed for encryption
+and hashing.
+
+|-------------------------|
+| nonce                   |
+| encryption_payload_size |
+| encrypted_header_size   |
+| flags                   |
+| header_checksum         |
+|-------------------------|
+
+****nonce****
+size: 24 bytes  
+
+The nonce is used to calculate the header MAC and decrypt the
+encrypted header payload.
+
+*Note:* Every time the file is generated, a unique nonce is needed. If
+a nonce is reused, the key could be exposed! It is advisable to use
+the time of file generation + a random number for the nonce.
+
+****encryption_payload_size****
+size: 2 bytes  
+
+Size of the encryption payload. The content of the encryption payload
+is specific to the cipher used for encryption and the hash function.
+
+****encrypted_header_size****
+size: 2 bytes  
+
+Size of the encrypted part of the full header. It is a sum of:
+- encryption payload
+- meta data header
+- meta data payload
+- data_header
+
+****flags****
+size: 1 byte
+
+| Name            | Bits    | Description                          |
+|-----------------+---------+--------------------------------------|
+| reserved        | 6, 7    | For future use                       |
+|-----------------+---------+--------------------------------------|
+| encryption used | 3, 4, 5 | Type of encryption used:             |
+|                 |         | 0 = No encryption                    |
+|                 |         | 1 = ChaCha20                         |
+|-----------------+---------+--------------------------------------|
+| hash used       | 0, 1, 2 | 0 = No hash                          |
+|                 |         | 1 = Poly1305                         |
+|-----------------+---------+--------------------------------------|
+
+****header_checksum****
+size: 1 byte  
+
+BSD checksum (8-bit) of the above header fields.
+
+***ENCRYPTION PAYLOAD***
+
+The encryption payload is specific to the cipher used for
+encryption/hashing and is encrypted with the default key. It is
+present only if there is an encryption header and is placed right
+after the encryption header.
+
+****ChaCha20 and Poly1305 payload****
+
+If these are used for encryption and integrity, the payload consists
+of a 32-byte-long key, which will be used to encrypt the blocks.
+
+***META DATA BLOCK (optional)***
+
+Any data can be encoded in the SSBF format. However, the format
+doesn't contain metadata about the data by default. If a user wants to
+store metadata about the actual data in the SSBF file, they can do so
+by adding a metadata block. If encryption is used, the metadata header
+is encrypted.
+
+The metadata block consists of a header and payload. It is placed
+after the encryption payload if encryption is used or after the main
+header if encryption is not used.
+
+****META DATA HEADER****
+
+|------------------------|
+| meta_data_id           |
+| meta_data_payload_size |
+|------------------------|
+
+*****meta_data_id*****
+size: 2 bytes  
+
+User-defined ID. It is used to identify the content of the metadata
+payload.
+
+*****meta_data_payload_size*****
+size: 2 bytes  
+Size of the user-provided payload.
+
+****META DATA PAYLOAD****
+Its structure and size are defined by the user.
+
+***DATA HEADER***
+
+The data header is mandatory and describes the basic information of
+the data payload contained in the blocks.
+
+|-----------------------------------------------------------------|
+| full_data_size_uncompressed                                     |
+| max_uncompressed_block_size                                     |
+| flags                                                           |
+| reserved                                                        |
+| full_data_checksu                                               |
+|-----------------------------------------------------------------|
+
+****full_data_size_uncompressed****
+size: 4 bytes  
+
+Data size of the payload before it was encoded in the SSBF format.
+
+****max_uncompressed_block_size****
+size: 2 bytes  
+
+Maximum data in a block. This information is used by the
+decoder/encoder to know how much memory to allocate when decompressing
+the payload. If the payload is not compressed, this should be the same
+as the block_payload_size in the block header.
+
+****flags****
+size: 1 byte
+
+| Name                | Bits | Description                               |
+|---------------------+------+-------------------------------------------|
+| block checksum      | 4, 5 | Checksum used for the whole original data:|
+|                     |      | 0 = BSD checksum 16-bit (default)         |
+|                     |      | 1 = CRC16                                 |
+|                     |      | 2 = Reserved                              |
+|---------------------+------+-------------------------------------------|
+| full data checksum  | 2, 3 | Checksum used for the whole original data:|
+|                     |      | 0 = BSD checksum 16-bit (default)         |
+|                     |      | 1 = CRC16                                 |
+|                     |      | 2 = CRC32                                 |
+|---------------------+------+-------------------------------------------|
+
+****reserved****
+size: 1 byte
+
+****full_data_checksum****
+size: 4 bytes  
+
+Stores the checksum for the whole payload before it was encoded in the
+SSBF format.
+
+***HASH***
+
+Contains a 16-byte-long hash (MAC) of all the data above, including
+the main header, crypto header and payload (if present), metadata
+block (if present), and the data header.
+
+***BLOCKS***
+
+The data is stored in multiple blocks. Each block has its own header.
+
+****PAYLOAD BLOCK HEADER****
+
+|-----------------|
+| block_number    |
+| compressed_size |
+| data_checksum   |
+| flags           |
+| header_checksum |
+|-----------------|
+
+*****block_number*****
+size: 2 bytes  
+
+Unique block number. The first block number is 0. The subsequent
+blocks are numbered as the previous block number + 1.
+
+*****block_payload_size*****
+size: 2 bytes  
+
+Payload data size in the block.
+
+*****block_payload_checksum*****
+size: 2 bytes  
+
+Checksum of the payload data in the block.
+
+*****flags*****
+size: 1 byte
+
+| Flag Name        |      Position | Description                            |
+|------------------+---------------+----------------------------------------|
+| reserved         | 3, 4, 5, 6, 7 | For future use                         |
+|------------------+---------------+----------------------------------------|
+| block encrypted  |             2 | Type of encryption used:               |
+|                  |               | 0 = Block not encrypted                |
+|                  |               | 1 = Block is encrypted with the cipher |
+|                  |               | defined in the main header             |
+|------------------+---------------+----------------------------------------|
+| block compressed |             1 | 0 = Block not compressed               |
+|                  |               | 1 = Block compressed with LZ4          |
+|------------------+---------------+----------------------------------------|
+| last block       |             0 | If this flag is set, this is the last  |
+|                  |               | block                                  |
+|------------------+---------------+----------------------------------------|
+
+*****header_checksum*****
+size: 1 byte  
+
+BSD checksum (8-bit) of the above fields.
+
+***HASH***
+
+At the end of the file is a 16-byte-long hash (MAC) of the header hash
+(MAC) and all the blocks.
