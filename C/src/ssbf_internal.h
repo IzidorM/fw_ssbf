@@ -49,6 +49,11 @@ struct ssbf_payload_block_header {
         uint8_t header_checksum;
 };
 
+enum ssbf_errors ssbf_decode_block_header(
+	uint8_t *input_data,
+	size_t input_data_size,
+	struct ssbf_payload_block_header *h);
+
 #ifdef UNIT_TESTS
 size_t ssbf_encode_block(uint8_t *key_data,
 			 uint8_t *output_mem,
@@ -65,11 +70,6 @@ void ssbf_encode_data_to_blocks(uint8_t *key_data,
 				size_t output_data_max_size,
 				size_t *actual_output_data_size);
 
-
-enum ssbf_errors ssbf_decode_block_header(
-	uint8_t *input_data,
-	size_t input_data_size,
-	struct ssbf_payload_block_header *h);
 
 
 enum ssbf_errors ssbf_decode_block(uint8_t *block_key,

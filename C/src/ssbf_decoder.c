@@ -15,29 +15,6 @@
 #define STATIC static
 #endif
 
-STATIC enum ssbf_errors ssbf_decode_block_header(
-	uint8_t *input_data,
-	size_t input_data_size,
-	struct ssbf_payload_block_header *h)
-{
-	if (sizeof(struct ssbf_payload_block_header) > input_data_size)
-	{
-		return SSBF_NOT_ENOUGHT_DATA;
-	}
-
-	uint8_t hcs = bsd_checksum8(input_data, 
-				    sizeof(struct ssbf_payload_block_header) - 1);
-
-	if (hcs != input_data[sizeof(struct ssbf_payload_block_header) - 1])
-	{
-		return SSBF_GENERIC_ERROR;
-	}
-
-	memcpy(h, input_data, sizeof(struct ssbf_payload_block_header));
-
-	return SSBF_NO_ERROR;
-}
-
 STATIC enum ssbf_errors ssbf_decode_block(uint8_t *key_block,
 				struct ssbf_payload_block_header *block_header,
 				uint8_t *input_data,
@@ -142,6 +119,29 @@ STATIC enum ssbf_errors ssbf_decode_data_from_blocks(uint8_t *key_block,
 	}
 
 	return r;
+}
+
+enum ssbf_errors ssbf_decode_block_header(
+	uint8_t *input_data,
+	size_t input_data_size,
+	struct ssbf_payload_block_header *h)
+{
+	if (sizeof(struct ssbf_payload_block_header) > input_data_size)
+	{
+		return SSBF_NOT_ENOUGHT_DATA;
+	}
+
+	uint8_t hcs = bsd_checksum8(input_data, 
+				    sizeof(struct ssbf_payload_block_header) - 1);
+
+	if (hcs != input_data[sizeof(struct ssbf_payload_block_header) - 1])
+	{
+		return SSBF_GENERIC_ERROR;
+	}
+
+	memcpy(h, input_data, sizeof(struct ssbf_payload_block_header));
+
+	return SSBF_NO_ERROR;
 }
 
 enum ssbf_errors ssbf_decode_data(uint8_t *key_main, //[32],
