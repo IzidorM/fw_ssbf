@@ -27,14 +27,12 @@ static int read_file_in_a_buffer(char *file_name,
 
         fseek(fp, 0L, SEEK_END);
         *buff_size = ftell(fp);
-        printf("There are %zu bytes in an input file\n", *buff_size);
 
         *buffer = malloc(*buff_size);
 	if (NULL == *buffer)
 	{
 		return 1;
 	}
-	
 
         rewind(fp);
         fread(*buffer, 1, *buff_size, fp);

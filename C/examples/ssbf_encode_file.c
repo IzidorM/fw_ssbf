@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdint.h>
+#include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
@@ -56,14 +57,12 @@ static int read_file_in_a_buffer(char *file_name,
 
         fseek(fp, 0L, SEEK_END);
         *buff_size = ftell(fp);
-        printf("There are %zu bytes in an input file\n", *buff_size);
 
         *buffer = malloc(*buff_size);
 	if (NULL == *buffer)
 	{
 		return 1;
 	}
-	
 
         rewind(fp);
         fread(*buffer, 1, *buff_size, fp);
@@ -71,6 +70,45 @@ static int read_file_in_a_buffer(char *file_name,
 	return 0;
 }
 
+int save_to_file(char *file_name, char *backup_file_name, 
+		 uint8_t *data, size_t data_size)
+{
+	uint32_t input_filename_len = strlen(backup_file_name);
+	char output_file_name[input_filename_len+1+5];
+
+
+	if (NULL == file_name)
+	{
+		// use the backup filename and add the .ssbf ending
+		memcpy(output_file_name, backup_file_name, 
+		       input_filename_len);
+
+		output_file_name[input_filename_len] =   '.';
+		output_file_name[input_filename_len+1] = 's';
+		output_file_name[input_filename_len+2] = 's';
+		output_file_name[input_filename_len+3] = 'b';
+		output_file_name[input_filename_len+4] = 'f';
+		output_file_name[input_filename_len+5] = '\0';
+
+		file_name = output_file_name;
+	}
+
+	// save encoded data to file
+	FILE * fpo;
+        fpo = fopen ((char *) file_name, "w");
+        if (NULL == fpo)
+        {
+                printf("File not found %s\n", (char *) output_file_name);
+                return 1;
+        }
+        
+        printf("Writing to %s %zu bytes\n", 
+	       file_name, data_size);
+        fwrite(data, 1, data_size, fpo);
+
+        fclose(fpo);
+	return 0;
+}
 
 int main(int argc, char **argv)
 {
@@ -78,10 +116,11 @@ int main(int argc, char **argv)
 	char *output_filename = NULL;
         char *key_filename = NULL;
 //        char *meta_data_filename = NULL;
-	
+
+	bool verbose = false;
         uint32_t block_size = 1024;
         int c;
-        while ((c = getopt(argc, argv, "k:f:b:m:o:h")) != -1)
+        while ((c = getopt(argc, argv, "k:f:b:m:o:v:h")) != -1)
         {
         	switch (c)
         	{
@@ -104,6 +143,9 @@ int main(int argc, char **argv)
 
         	case 'o':
         		output_filename = optarg;
+        		break;
+        	case 'v':
+			verbose = true;
         		break;
 
         	case 'h':
@@ -196,22 +238,22 @@ int main(int argc, char **argv)
 		       (int) data_key_size);		
 		return 1;
 	}
-    
-	// print the random data key
-	printf("data key: ");
-	for (int i = 0; i < 32; i++) {
-		printf("%02x", data_key[i]);
-	}
-	printf("\n");
 
-	printf("nonce: ");
-	for (int i = 0; i < 24; i++) {
-		printf("%02x", nonce[i]);
-	}
-	printf("\n");
+	if (verbose)
+	{
+		// print the random data key
+		printf("data key: ");
+		for (int i = 0; i < 32; i++) {
+			printf("%02x", data_key[i]);
+		}
+		printf("\n");
 
-	// THIS needs to be uniqu for every encoded file
-	// because if it is used twice, the main key could be exposed
+		printf("nonce: ");
+		for (int i = 0; i < 24; i++) {
+			printf("%02x", nonce[i]);
+		}
+		printf("\n");
+	}
 
 	uint8_t *output_data_start = malloc(2*input_file_buffer_size + 1);
 	size_t encoded_file_size = 0;
@@ -239,39 +281,14 @@ int main(int argc, char **argv)
         printf("compression ratio: %f\n", 
 	       (double) encoded_file_size / input_file_buffer_size);
 
-	uint32_t input_filename_len = strlen(data_filename);
-	char output_file_name[input_filename_len+1+5];
+	r = save_to_file(output_filename, data_filename,
+			 output_data_start, encoded_file_size);
 
-	if (NULL == output_filename)
+	if (0 == r)
 	{
-
-
-		memcpy(output_file_name, data_filename, input_filename_len);
-
-		output_file_name[input_filename_len] =   '.';
-		output_file_name[input_filename_len+1] = 's';
-		output_file_name[input_filename_len+2] = 's';
-		output_file_name[input_filename_len+3] = 'b';
-		output_file_name[input_filename_len+4] = 'f';
-		output_file_name[input_filename_len+5] = '\0';
-
-		output_filename = output_file_name;
+		printf("Done\n");
 	}
 
-
-	FILE * fpo;
-        fpo = fopen ((char *) output_filename, "w");
-        if (NULL == fpo)
-        {
-                printf("File not found %s\n", (char *) output_file_name);
-                return 1;
-        }
-        
-        printf("Writing to %s %zu bytes\n", 
-	       output_filename, encoded_file_size);
-        fwrite(output_data_start, 1, encoded_file_size, fpo);
-
-        fclose(fpo);
-        printf("Done\n");
+	return r;
 }
 
