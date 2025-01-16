@@ -185,6 +185,8 @@ void ssbf_encode_data(uint8_t *key_main, //[32],
 		 | SSBF_ENCRYPTION_HEADER_FLAG_USE_CHACHA20,
 	};
 
+	memcpy(ch.nonce, key_main_nonce, 24);
+
 	ch.header_checksum = bsd_checksum8(
 		(uint8_t *) &ch, sizeof(struct ssbf_encryption_header)-1);
 
